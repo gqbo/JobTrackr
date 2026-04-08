@@ -3,6 +3,9 @@
 @docs/project-overview.md
 @docs/architecture.md
 @docs/testing.md
+@docs/backend.md
+@docs/frontend.md
+@docs/design-system.md
 
 ## Commands
 - Backend dev: `cd backend && uvicorn app.main:app --reload`
@@ -16,7 +19,6 @@
 ## Code Style
 - Python: snake_case, type hints on all function signatures, Pydantic models for all request/response schemas
 - TypeScript: strict mode, interfaces over types for object shapes, named exports
-- Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
 
 ## Architecture — NON-NEGOTIABLE
 - Routers: receive request + call service + return response. ZERO logic.
