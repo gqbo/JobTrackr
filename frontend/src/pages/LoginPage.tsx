@@ -1,8 +1,18 @@
-import { type FormEvent, useState } from 'react'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useNavigate } from 'react-router-dom'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
+import {
+  loginSchema,
+  signupSchema,
+  type LoginFormValues,
+  type SignupFormValues,
+} from '@/validation/schemas/auth.schema'
 
 type Mode = 'signin' | 'signup'
+type FormValues = LoginFormValues | SignupFormValues
 
 // Decorative card thumbnails for the left panel
 const PREVIEW_CARDS = [
@@ -28,39 +38,37 @@ function PreviewCard({ bg, accent }: { bg: string; accent: string }) {
 
 export function LoginPage() {
   const { signIn, signUp } = useAuth()
+  const navigate = useNavigate()
   const [mode, setMode] = useState<Mode>('signin')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccessMsg(null)
-    setIsSubmitting(true)
-
-    try {
-      if (mode === 'signin') {
-        await signIn(email, password)
-        // Navigation will happen via AuthContext → App routing
-      } else {
-        await signUp(email, password)
-        setSuccessMsg('Account created! Check your email to confirm before signing in.')
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  const form = useForm<FormValues>({
+    resolver: zodResolver(mode === 'signin' ? loginSchema : signupSchema),
+    mode: 'onTouched',
+  })
 
   const switchMode = (next: Mode) => {
     setMode(next)
-    setError(null)
     setSuccessMsg(null)
+    form.reset()
   }
+
+  const onSubmit = form.handleSubmit(async (data) => {
+    setSuccessMsg(null)
+    try {
+      if (mode === 'signin') {
+        await signIn(data.email, data.password)
+        navigate('/')
+      } else {
+        await signUp(data.email, data.password)
+        setSuccessMsg('Account created! Check your email to confirm before signing in.')
+      }
+    } catch (err) {
+      form.setError('root', {
+        message: err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+      })
+    }
+  })
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -156,19 +164,17 @@ export function LoginPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
             {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label className="font-body text-xs font-medium text-[#5f5f61] uppercase tracking-wider">
                 Email Address
               </label>
               <input
+                {...form.register('email')}
                 type="email"
-                required
                 autoComplete="email"
                 placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 className="
                   w-full px-4 py-3 rounded-md font-body text-sm text-[#323235]
                   bg-white border border-[#b3b1b4]/20
@@ -177,6 +183,11 @@ export function LoginPage() {
                   transition-all
                 "
               />
+              {form.formState.errors.email && (
+                <p className="font-body text-xs text-[#ba1a1a]">
+                  {form.formState.errors.email.message}
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -195,12 +206,10 @@ export function LoginPage() {
                 )}
               </div>
               <input
+                {...form.register('password')}
                 type="password"
-                required
                 autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 className="
                   w-full px-4 py-3 rounded-md font-body text-sm text-[#323235]
                   bg-white border border-[#b3b1b4]/20
@@ -209,12 +218,17 @@ export function LoginPage() {
                   transition-all
                 "
               />
+              {form.formState.errors.password && (
+                <p className="font-body text-xs text-[#ba1a1a]">
+                  {form.formState.errors.password.message}
+                </p>
+              )}
             </div>
 
-            {/* Error / Success messages */}
-            {error && (
+            {/* Root error (Supabase errors) / Success message */}
+            {form.formState.errors.root && (
               <p className="font-body text-xs text-[#ba1a1a] bg-[#ba1a1a]/5 px-3 py-2 rounded-md">
-                {error}
+                {form.formState.errors.root.message}
               </p>
             )}
             {successMsg && (
@@ -226,7 +240,7 @@ export function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={form.formState.isSubmitting}
               className="
                 w-full py-3 mt-2 rounded-md font-body font-semibold text-sm text-white
                 bg-gradient-to-br from-[#005ac2] to-[#004fab]
@@ -235,7 +249,7 @@ export function LoginPage() {
                 transition-all shadow-sm
               "
             >
-              {isSubmitting
+              {form.formState.isSubmitting
                 ? mode === 'signin'
                   ? 'Signing in…'
                   : 'Creating account…'
