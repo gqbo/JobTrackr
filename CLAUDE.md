@@ -1,11 +1,15 @@
 # JobTrackr
 
-@docs/project-overview.md
-@docs/architecture.md
-@docs/testing.md
-@docs/backend.md
-@docs/frontend.md
-@docs/design-system.md
+## Docs — Load on demand
+Read the relevant doc BEFORE working in that area. Do not load all docs upfront.
+
+| Working on... | Read this |
+|---|---|
+| Frontend components, routing, state | `docs/frontend.md` + `docs/design-system.md` |
+| Backend routes, services, repos | `docs/backend.md` |
+| Tests (any layer) | `docs/testing.md` |
+| Auth flow, system diagram, cross-cutting | `docs/architecture.md` |
+| Roadmap, DB schema, tech stack | `docs/project-overview.md` |
 
 ## Commands
 - Backend dev: `cd backend && uvicorn app.main:app --reload`
