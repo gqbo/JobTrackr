@@ -1,136 +1,68 @@
 # Frontend — Patterns & Conventions
 
-## State Management Strategy
+## State Management
 
 | State Type | Tool | Example |
-|------------|------|---------|
-| Server data | TanStack Query | Applications list, stats, user profile |
-| Auth | React Context | Current user session, login/logout |
-| UI | useState | Modal open/close, form inputs, toggles |
+|---|---|---|
+| Server data | TanStack Query | Applications, stats, user profile |
+| Auth | React Context | Current user session |
+| UI | useState | Modals, toggles, form inputs |
 
-### Why No Redux/Zustand
-TanStack Query handles server state (fetching, caching, invalidation, optimistic updates). React Context handles the one piece of global client state (auth). Everything else is local to components. Adding a state management library would add complexity with zero benefit for this app.
+No Redux, no Zustand — TanStack Query covers server state, Context covers auth. Adding a state library would be complexity with zero benefit.
 
-## TanStack Query Patterns
+## TanStack Query
 
-### Query Keys Convention
-```typescript
-// Hierarchical keys for smart invalidation
-['applications']                    // all applications
-['applications', { status, search }] // filtered list
-['applications', id]                // single application
-['stats']                           // dashboard stats
-```
+Query keys are hierarchical for smart invalidation:
+- `['applications']` — all
+- `['applications', { status, search }]` — filtered
+- `['applications', id]` — single
+- `['stats']` — dashboard stats
 
-### Custom Hooks
-All data fetching happens in custom hooks, never in components directly:
-
-```typescript
-// hooks/useApplications.ts
-export function useApplications(filters: ApplicationFilters) {
-  return useQuery({
-    queryKey: ['applications', filters],
-    queryFn: () => api.getApplications(filters),
-  })
-}
-```
-
-Components call hooks, hooks call API functions, API functions call axios.
-
-### Mutations with Optimistic Updates
-```typescript
-export function useUpdateApplication() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: api.updateApplication,
-    onMutate: async (updated) => {
-      // Cancel outgoing queries, snapshot, optimistically update
-    },
-    onError: (err, updated, context) => {
-      // Rollback on error
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
-    },
-  })
-}
-```
+All data fetching in custom hooks (`hooks/`), never in components directly. Components call hooks → hooks call API functions → API functions call axios.
 
 ## Component Organization
 
 ```
 src/
-  components/          # Reusable, generic components
-    ui/                # shadcn/ui components (auto-generated)
-    ApplicationCard.tsx
-    StatusBadge.tsx
-    ExcitementStars.tsx
-  pages/               # Route-level components (one per route)
-    LoginPage.tsx
-    DashboardPage.tsx
-    ApplicationsPage.tsx
-  hooks/               # Custom hooks (data fetching, auth, etc.)
-    useApplications.ts
-    useAuth.ts
-    useStats.ts
-  lib/                 # Configuration and utilities
-    axios.ts           # Configured axios instance
-    queryClient.ts     # TanStack Query client config
-    supabase.ts        # Supabase client (auth only)
-  types/               # TypeScript interfaces and enums
-    application.ts
-    auth.ts
-    api.ts
+  components/
+    ui/                    # shadcn/ui — do not modify after generation
+    AuthBrandingPanel.tsx  # Shared left panel for all auth pages
+    FieldError.tsx         # AlertCircle icon + message for field errors
+    PasswordInput.tsx      # Password input with Eye/EyeOff toggle
+    ProtectedLayout.tsx    # Redirects to /login if no Supabase session
+  pages/                   # One component per route
+  hooks/                   # All data fetching and auth hooks
+  lib/
+    axios.ts               # Configured instance with auth interceptor
+    supabase.ts            # Supabase client (auth only)
+  types/                   # All TypeScript interfaces — never use `any`
+  validation/
+    schemas/auth.schema.ts # Zod schemas + inferred types
 ```
 
-### Rules
-- Pages fetch data (via hooks). Components receive data via props.
-- Never import axios directly in components — use the configured instance from `lib/axios.ts`
-- Never use `any` type — define interfaces in `types/`
-- shadcn/ui components live in `components/ui/` and are NOT modified after generation
+Rules:
+- Pages use hooks. Components receive data via props.
+- Never import axios directly — always use `lib/axios.ts`
+- Never use `any` — define interfaces in `types/`
+- shadcn/ui components in `components/ui/` are NOT modified after generation
 
-## Axios Setup
+## Axios
 
-```typescript
-// lib/axios.ts
-import axios from 'axios'
-import { supabase } from './supabase'
+`lib/axios.ts` has a request interceptor that reads the Supabase session from localStorage and attaches `Authorization: Bearer <token>` on every request. Never instantiate axios elsewhere.
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-})
+## Auth Flow (Frontend)
 
-api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`
-  }
-  return config
-})
-
-export default api
-```
-
-## Auth Flow (Frontend Side)
-
-1. User clicks Login/Register → Supabase JS SDK handles auth
-2. Supabase stores session in localStorage automatically
-3. axios interceptor reads the token from Supabase session
-4. Token is sent as `Authorization: Bearer <token>` on every API call
-5. AuthContext provides `user`, `signIn`, `signOut`, `loading` to the app
-6. Protected routes redirect to `/login` if no session
+1. Form submit → Supabase JS SDK handles auth directly (no FastAPI involved)
+2. Supabase stores JWT in localStorage automatically
+3. `AuthContext` listens to `onAuthStateChange`, exposes `user`, `signIn`, `signOut`, `loading`
+4. axios interceptor reads token from Supabase session and attaches it to API calls
+5. `ProtectedLayout` checks `user` from context — frontend-only, no backend call
 
 ## Routing
 
-```typescript
-// React Router v6
-<Routes>
-  <Route path="/login" element={<LoginPage />} />
-  <Route element={<ProtectedLayout />}>
-    <Route path="/" element={<DashboardPage />} />
-    <Route path="/applications" element={<ApplicationsPage />} />
-  </Route>
-</Routes>
-```
+Uses `createBrowserRouter` + `RouteObject[]` (React Router v7). Defined in `src/routes/routes.tsx`.
 
-`ProtectedLayout` checks auth context and redirects to `/login` if not authenticated.
+- Public: `/login`, `/register` — share `AuthBrandingPanel`, hardcoded to their mode, no toggle state
+- Protected: wrapped in `ProtectedLayout`, redirect to `/login` if no session
+- `/` redirects to `/dashboard`
+- `*` renders `NotFoundPage` (inline in routes.tsx)

@@ -6,102 +6,41 @@
 - Don't test library code (supabase-py, axios, React internals)
 - Every endpoint: happy path + auth failure + validation error at minimum
 
-## Backend Testing (pytest + httpx)
+## Commands
 
-### Commands
 ```bash
+# Backend
 cd backend
-pytest                                    # run all tests
-pytest tests/test_api/ -v                 # integration tests only
-pytest tests/test_services/ -v            # unit tests only
-pytest tests/test_api/test_health.py -v   # single file
-pytest -k "test_create_application" -v    # single test by name
-```
+pytest                              # all tests
+pytest tests/test_api/ -v           # integration only
+pytest tests/test_services/ -v      # unit only
+pytest -k "test_name" -v            # single test
 
-### Integration Tests (`tests/test_api/`)
-Test the full request cycle: HTTP request → router → service → repository → response.
-
-```python
-# tests/test_api/test_health.py
-from httpx import AsyncClient
-
-async def test_health_check(client: AsyncClient):
-    response = await client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-```
-
-Use `conftest.py` fixtures for:
-- `client`: httpx AsyncClient with the FastAPI app
-- `authenticated_client`: client with valid JWT in headers
-- `test_user_id`: a known user ID for test data
-
-### Service Unit Tests (`tests/test_services/`)
-Test business logic in isolation with mocked repositories.
-
-```python
-# tests/test_services/test_application.py
-async def test_create_application_detects_duplicate(
-    application_service, mock_repo
-):
-    mock_repo.get_by_url.return_value = existing_app
-    with pytest.raises(DuplicateApplicationError):
-        await application_service.create(app_data)
-```
-
-### What NOT to Test
-- Repository methods (they're thin wrappers over supabase-py)
-- Pydantic model validation (Pydantic is already tested)
-- FastAPI dependency injection mechanics
-- Supabase SDK behavior
-
-## Frontend Testing (Vitest + React Testing Library)
-
-### Commands
-```bash
+# Frontend
 cd frontend
-npx vitest              # run all tests
-npx vitest --watch      # watch mode
-npx vitest --run        # CI mode (no watch)
+npx vitest          # watch mode
+npx vitest --run    # CI mode
 ```
 
-### Component Tests
-Test what the user sees and does, not component internals.
+## Backend
 
-```typescript
-// __tests__/StatusBadge.test.tsx
-import { render, screen } from '@testing-library/react'
-import { StatusBadge } from '../components/StatusBadge'
+**Integration tests** (`tests/test_api/`): full request cycle — HTTP → router → service → repository → response. Use `conftest.py` fixtures: `client`, `authenticated_client`, `test_user_id`.
 
-test('renders the correct status text', () => {
-  render(<StatusBadge status="Applied" />)
-  expect(screen.getByText('Applied')).toBeInTheDocument()
-})
-```
+**Unit tests** (`tests/test_services/`): business logic in isolation with mocked repositories.
 
-### Hook Tests
-Test custom hooks with `renderHook`.
+**What NOT to test:** repository methods (thin supabase-py wrappers), Pydantic validation, FastAPI DI mechanics, Supabase SDK behavior.
 
-```typescript
-import { renderHook, waitFor } from '@testing-library/react'
-import { useApplications } from '../hooks/useApplications'
+## Frontend
 
-test('fetches applications', async () => {
-  const { result } = renderHook(() => useApplications({}), { wrapper })
-  await waitFor(() => expect(result.current.isSuccess).toBe(true))
-  expect(result.current.data).toHaveLength(3)
-})
-```
+**Component tests:** test what the user sees and does — use `render` + `screen` queries. Not implementation details.
 
-### What NOT to Test
-- shadcn/ui components (they're maintained externally)
-- TanStack Query caching behavior (TanStack tests this)
-- React Router navigation mechanics
-- CSS/styling
+**Hook tests:** use `renderHook` from React Testing Library.
 
-## E2E Testing
-Not in scope for initial sprints. Playwright can be added later for critical flows (login → create application → verify in table).
+**What NOT to test:** shadcn/ui components, TanStack Query caching, React Router navigation, CSS/styling.
 
-## Test File Naming
+## E2E
+Not in scope for initial sprints. Playwright can be added later for critical flows.
+
+## File Naming
 - Backend: `test_<module>.py` in `tests/test_api/` or `tests/test_services/`
-- Frontend: `<Component>.test.tsx` or `<hook>.test.ts` next to source files or in `__tests__/`
+- Frontend: `<Component>.test.tsx` or `<hook>.test.ts` — next to source or in `__tests__/`

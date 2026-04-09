@@ -30,3 +30,17 @@
 - Run relevant tests after changes (`pytest` or `vitest`, not both unless both changed)
 - Never hardcode config values — use pydantic-settings (backend) or env vars (frontend)
 - Supabase Auth handles all auth flows. Backend only VERIFIES JWTs.
+
+## Docs Maintenance — MANDATORY
+After implementing any change that affects the items below, update the corresponding doc file BEFORE committing:
+
+| Change type | File to update |
+|---|---|
+| Auth flow, layered architecture, system diagram | `docs/architecture.md` |
+| New frontend patterns, state strategy, component structure | `docs/frontend.md` |
+| New backend patterns, layer rules, exception handling | `docs/backend.md` |
+| Testing strategy, new test patterns, commands | `docs/testing.md` |
+| Design tokens, component variants, layout rules | `docs/design-system.md` |
+| Sprint roadmap, tech stack changes, DB schema | `docs/project-overview.md` |
+
+If a change doesn't fit any existing doc, ask the user before creating a new one.

@@ -4,109 +4,62 @@
 
 ```
 ┌──────────────────┐        ┌──────────────────┐       ┌──────────────┐
-│                  │  HTTP   │                  │  SDK  │              │
-│   React + Vite   │───────→│   FastAPI         │──────→│   Supabase   │
-│   (Frontend)     │←───────│   (Backend)       │←──────│   (DB+Auth)  │
-│                  │  JSON   │                  │       │              │
+│   React + Vite   │─HTTP──→│   FastAPI         │─SDK──→│   Supabase   │
+│   (Frontend)     │←──JSON─│   (Backend)       │←──────│   (DB+Auth)  │
 └────────┬─────────┘        └──────────────────┘       └──────┬───────┘
-         │                                                     │
-         │              Supabase Auth SDK                      │
+         │                    Supabase Auth SDK               │
          └─────────────────────────────────────────────────────┘
-                    (signup, signin, OAuth, session)
 ```
 
-The frontend talks to TWO systems:
-1. **Supabase Auth SDK** — directly for authentication (signup, signin, OAuth, session management)
-2. **FastAPI Backend** — for all application data (CRUD, stats, extraction)
-
-The backend talks to ONE system:
-1. **Supabase** — via supabase-py for database operations and JWT verification
+Frontend talks to TWO systems:
+1. **Supabase Auth SDK** — directly for auth (signup, signin, OAuth, session)
+2. **FastAPI** — for all application data (CRUD, stats, AI extraction)
 
 ## Auth Flow
 
 ```
-┌──────────┐    1. signup/signin     ┌──────────────┐
-│ Frontend │ ──────────────────────→ │ Supabase Auth│
-│          │ ←────────────────────── │              │
-│          │    2. JWT token          └──────────────┘
-│          │
-│          │    3. API call + JWT     ┌──────────────┐
-│          │ ──────────────────────→ │ FastAPI       │
-│          │                         │              │
-│          │                         │ 4. Verify JWT│
-│          │                         │    (PyJWT)   │
-│          │                         │              │
-│          │    5. Response           │ 5. Process   │
-│          │ ←────────────────────── │    request   │
-└──────────┘                         └──────────────┘
+Frontend ──signup/signin──→ Supabase Auth ──JWT──→ Frontend (localStorage)
+Frontend ──API call + JWT──→ FastAPI ──verify JWT (PyJWT)──→ process request
 ```
 
-Key points:
-- Backend NEVER issues tokens — Supabase Auth does
-- Backend NEVER handles passwords — Supabase Auth does
-- Backend ONLY verifies JWTs and extracts user_id from claims
-- Frontend stores session via Supabase SDK (localStorage)
+- Backend NEVER issues tokens or handles passwords — Supabase does
+- Backend ONLY verifies JWTs and extracts `user_id` from claims
+- Frontend protection (`ProtectedLayout`) is UI-only — checks Supabase session, no backend call
+- Backend protection happens per-request when actual data is needed
 
 ## Backend Layered Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│                  Routers                     │  app/api/
-│  Parse request → call service → return JSON  │
-└──────────────────┬──────────────────────────┘
-                   │ Pydantic models
-┌──────────────────▼──────────────────────────┐
-│                 Services                     │  app/services/
-│  Business logic, validation, orchestration   │
-└──────────────────┬──────────────────────────┘
-                   │ Pydantic models
-┌──────────────────▼──────────────────────────┐
-│              Repositories                    │  app/repositories/
-│  supabase-py calls, data mapping             │
-└──────────────────┬──────────────────────────┘
-                   │ supabase-py SDK
-┌──────────────────▼──────────────────────────┐
-│            Supabase (PostgreSQL)             │
-└─────────────────────────────────────────────┘
+Routers (app/api/)       — parse request, call service, return response
+    ↓ Pydantic models
+Services (app/services/) — ALL business logic
+    ↓ Pydantic models
+Repositories (app/repositories/) — ONLY layer that talks to Supabase
+    ↓ supabase-py
+Supabase (PostgreSQL)
 ```
-
-Data flows DOWN as Pydantic models. Repositories translate between Supabase responses and Pydantic models. Services never see raw database responses.
 
 ## Frontend Data Flow
 
 ```
-Page (useApplications hook)
-  → TanStack Query (cache, dedup, retry)
-    → axios instance (auth header injection)
-      → FastAPI endpoint
-        → response
-      ← JSON
-    ← cached data
-  ← { data, isLoading, error }
-→ render components with data
+Page → custom hook → TanStack Query → axios (+ JWT header) → FastAPI → JSON
 ```
 
 ## AI Extraction Flow (Sprint 3)
 
 ```
-User pastes URL
-  → POST /applications/extract-from-url
-    → httpx fetches page HTML
-      → BeautifulSoup parses HTML
-        → Enough content? 
-          YES → LLM extracts structured data
-          NO  → Return partial/empty → frontend asks user to paste text
-    → Pydantic validates LLM output
-      → Valid? Pre-fill form
-      → Invalid? Fallback to manual entry
+POST /applications/extract-from-url
+  → httpx fetches HTML → BeautifulSoup parses
+  → enough content? YES → LLM extracts structured data
+                    NO  → return partial, frontend asks user to paste text
+  → Pydantic validates → pre-fill form or fallback to manual entry
 ```
 
 ## Database Migrations
 
 ```bash
-supabase migration new create_applications_table   # creates SQL file
-# Edit the migration SQL
-supabase db push                                    # applies to local DB
+supabase migration new <name>   # create SQL file in supabase/migrations/
+supabase db push                # apply to local DB
 ```
 
-Migrations live in `supabase/migrations/` and are versioned in git. Every schema change goes through a migration — never modify the database manually.
+Never modify the database manually — always go through migrations.
