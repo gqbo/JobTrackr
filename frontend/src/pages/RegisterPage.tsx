@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { useAuth } from '@/hooks/useAuth'
 import { AuthBrandingPanel } from '@/components/AuthBrandingPanel'
+import { FieldError } from '@/components/FieldError'
+import { PasswordInput } from '@/components/PasswordInput'
 import { signupSchema, type SignupFormValues } from '@/validation/schemas/auth.schema'
 
 export function RegisterPage() {
@@ -62,9 +64,7 @@ export function RegisterPage() {
                 "
               />
               {form.formState.errors.email && (
-                <p className="font-body text-xs text-[#ba1a1a]">
-                  {form.formState.errors.email.message}
-                </p>
+                <FieldError message={form.formState.errors.email.message!} />
               )}
             </div>
 
@@ -73,23 +73,15 @@ export function RegisterPage() {
               <label className="font-body text-xs font-medium text-[#5f5f61] uppercase tracking-wider">
                 Password
               </label>
-              <input
+              <PasswordInput
                 {...form.register('password')}
-                type="password"
                 autoComplete="new-password"
                 placeholder="••••••••"
-                className="
-                  w-full px-4 py-3 rounded-md font-body text-sm text-[#323235]
-                  bg-white border border-[#b3b1b4]/20
-                  placeholder:text-[#b3b1b4]
-                  focus:outline-none focus:border-[#005ac2] focus:ring-2 focus:ring-[#005ac2]/10
-                  transition-all
-                "
               />
-              {form.formState.errors.password && (
-                <p className="font-body text-xs text-[#ba1a1a]">
-                  {form.formState.errors.password.message}
-                </p>
+              {form.formState.errors.password ? (
+                <FieldError message={form.formState.errors.password.message!} />
+              ) : (
+                <p className="font-body text-xs text-[#5f5f61]">Must be at least 8 characters.</p>
               )}
             </div>
 
