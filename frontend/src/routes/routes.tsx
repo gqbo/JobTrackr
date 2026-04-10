@@ -1,8 +1,10 @@
 import { Navigate, type RouteObject } from 'react-router-dom'
 
 import { ProtectedLayout } from '@/components/ProtectedLayout'
+import { DashboardLayout } from '@/components/DashboardLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { ApplicationsPage } from '@/pages/ApplicationsPage'
 
 function NotFoundPage() {
   return (
@@ -23,12 +25,10 @@ export const routes: RouteObject[] = [
     children: [
       { path: '/', element: <Navigate to="/dashboard" replace /> },
       {
-        path: '/dashboard',
-        element: (
-          <div className="min-h-screen bg-[#fcf8f9] flex items-center justify-center">
-            <p className="font-body text-[#5f5f61]">Dashboard — coming in Sprint 2</p>
-          </div>
-        ),
+        element: <DashboardLayout />,
+        children: [
+          { path: '/dashboard', element: <ApplicationsPage /> },
+        ],
       },
     ],
   },
